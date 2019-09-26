@@ -1,7 +1,10 @@
 #coding: utf-8
 
 from smbus2 import SMBus
+from collections import OrderedDict
 import time
+import datetime
+import json
 
 bus_number  = 1
 i2c_address = 0x76
@@ -66,9 +69,8 @@ def readData():
 	temp_raw = (data[3] << 12) | (data[4] << 4) | (data[5] >> 4)
 	hum_raw  = (data[6] << 8)  |  data[7]
 	
-	compensate_T(temp_raw)
-	compensate_P(pres_raw)
-	compensate_H(hum_raw)
+        datadict = OrderedDict([("time",str(datetime.datetime.now())[:-7]),("temp",round(compensate_T(temp_raw),2)),("pres",round(compensate_P(pres_raw),2)),("hum",round(compensate_H(hum_raw),2))])
+        return datadict
 
 def compensate_P(adc_P):
 	global  t_fine
@@ -92,7 +94,7 @@ def compensate_P(adc_P):
 	v2 = ((pressure / 4.0) * digP[7]) / 8192.0
 	pressure = pressure + ((v1 + v2 + digP[6]) / 16.0)  
 
-	print "pressure : %7.2f hPa" % (pressure/100)
+	return (pressure/100)
 
 def compensate_T(adc_T):
 	global t_fine
@@ -100,7 +102,8 @@ def compensate_T(adc_T):
 	v2 = (adc_T / 131072.0 - digT[0] / 8192.0) * (adc_T / 131072.0 - digT[0] / 8192.0) * digT[2]
 	t_fine = v1 + v2
 	temperature = t_fine / 5120.0
-	print "temp : %-6.2f ℃" % (temperature) 
+
+	return (temperature) 
 
 def compensate_H(adc_H):
 	global t_fine
@@ -114,7 +117,8 @@ def compensate_H(adc_H):
 		var_h = 100.0
 	elif var_h < 0.0:
 		var_h = 0.0
-	print "hum : %6.2f ％" % (var_h)
+
+	return (var_h)
 
 
 def setup():
@@ -140,10 +144,15 @@ get_calib_param()
 
 
 if __name__ == '__main__':
+    hoge = 0
+    datadict = OrderedDict()
     while True:
 	try:
-		readData()
+	    datadict["id" + str(hoge)] = readData()
+            f = open("sensor.json",'w')
+            json.dump(datadict,f,indent=4,sort_keys=False)
+            print("id" + str(hoge) + " converted to json")
 	except KeyboardInterrupt:
-		pass
-        print('')
+            pass
+        hoge = hoge + 1
         time.sleep(10)
